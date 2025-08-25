@@ -3,7 +3,6 @@ package techindicators
 import (
 	"errors"
 	"fmt"
-	"strconv"
 )
 
 // PriceType represents which price to use for SMA calculation
@@ -25,7 +24,7 @@ type SMAResult struct {
 }
 
 // CalculateSMA calculates Simple Moving Average for the given dataset
-func CalculateSMA(dataset [][]string, period int, priceType PriceType) ([]SMAResult, error) {
+func CalculateSMA(dataset []OHLCV, period int, priceType PriceType) ([]SMAResult, error) {
 	if len(dataset) == 0 {
 		return nil, errors.New("dataset is empty")
 	}
@@ -46,10 +45,7 @@ func CalculateSMA(dataset [][]string, period int, priceType PriceType) ([]SMARes
 
 		// Sum the last 'period' values
 		for j := i - period + 1; j <= i; j++ {
-			price, err := extractPrice(dataset[j], priceType)
-			if err != nil {
-				return nil, fmt.Errorf("error at index %d: %w", j, err)
-			}
+			price := dataset[j].ExtractPrice(priceType)
 			sum += price
 		}
 
@@ -58,7 +54,7 @@ func CalculateSMA(dataset [][]string, period int, priceType PriceType) ([]SMARes
 
 		// Add result with corresponding timestamp
 		results = append(results, SMAResult{
-			Timestamp: dataset[i][0],
+			Timestamp: dataset[i].Timestamp.Format("2006-01-02T15:04:05Z"),
 			Value:     smaValue,
 		})
 	}
@@ -66,53 +62,8 @@ func CalculateSMA(dataset [][]string, period int, priceType PriceType) ([]SMARes
 	return results, nil
 }
 
-// extractPrice extracts the specified price type from a candle
-func extractPrice(candle []string, priceType PriceType) (float64, error) {
-	if len(candle) < 6 {
-		return 0, errors.New("invalid candle data: insufficient fields")
-	}
-
-	// Parse required prices
-	open, err := strconv.ParseFloat(candle[1], 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid open price: %w", err)
-	}
-
-	close, err := strconv.ParseFloat(candle[2], 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid close price: %w", err)
-	}
-
-	high, err := strconv.ParseFloat(candle[3], 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid high price: %w", err)
-	}
-
-	low, err := strconv.ParseFloat(candle[4], 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid low price: %w", err)
-	}
-
-	switch priceType {
-	case OpenPrice:
-		return open, nil
-	case ClosePrice:
-		return close, nil
-	case HighPrice:
-		return high, nil
-	case LowPrice:
-		return low, nil
-	case TypicalPrice:
-		return (high + low + close) / 3, nil
-	case WeightedPrice:
-		return (high + low + 2*close) / 4, nil
-	default:
-		return close, nil // Default to close price
-	}
-}
-
 // CalculateMultipleSMA calculates multiple SMAs with different periods
-func CalculateMultipleSMA(dataset [][]string, periods []int, priceType PriceType) (map[int][]SMAResult, error) {
+func CalculateMultipleSMA(dataset []OHLCV, periods []int, priceType PriceType) (map[int][]SMAResult, error) {
 	results := make(map[int][]SMAResult)
 
 	for _, period := range periods {
@@ -127,7 +78,7 @@ func CalculateMultipleSMA(dataset [][]string, periods []int, priceType PriceType
 }
 
 // GetLatestSMA returns the most recent SMA value
-func GetLatestSMA(dataset [][]string, period int, priceType PriceType) (float64, error) {
+func GetLatestSMA(dataset []OHLCV, period int, priceType PriceType) (float64, error) {
 	smaResults, err := CalculateSMA(dataset, period, priceType)
 	if err != nil {
 		return 0, err
@@ -141,7 +92,7 @@ func GetLatestSMA(dataset [][]string, period int, priceType PriceType) (float64,
 }
 
 // IsPriceAboveSMA checks if current price is above the SMA
-func IsPriceAboveSMA(dataset [][]string, period int, priceType PriceType) (bool, error) {
+func IsPriceAboveSMA(dataset []OHLCV, period int, priceType PriceType) (bool, error) {
 	if len(dataset) == 0 {
 		return false, errors.New("dataset is empty")
 	}
@@ -153,16 +104,13 @@ func IsPriceAboveSMA(dataset [][]string, period int, priceType PriceType) (bool,
 	}
 
 	// Get current price (latest close)
-	currentPrice, err := extractPrice(dataset[len(dataset)-1], ClosePrice)
-	if err != nil {
-		return false, err
-	}
+	currentPrice := dataset[len(dataset)-1].ExtractPrice(ClosePrice)
 
 	return currentPrice > latestSMA, nil
 }
 
 // SMACrossover detects if there's a bullish/bearish crossover between two SMAs
-func SMACrossover(dataset [][]string, fastPeriod, slowPeriod int, priceType PriceType) (string, error) {
+func SMACrossover(dataset []OHLCV, fastPeriod, slowPeriod int, priceType PriceType) (string, error) {
 	if fastPeriod >= slowPeriod {
 		return "", errors.New("fast period must be less than slow period")
 	}

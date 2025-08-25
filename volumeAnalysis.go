@@ -3,7 +3,6 @@ package techindicators
 import (
 	"errors"
 	"fmt"
-	"strconv"
 )
 
 // CombinedTechnicalAnalysis integrates SMA, Bollinger Bands, and RSI
@@ -36,7 +35,7 @@ type VolumeSignal struct {
 }
 
 // CalculateVolumeAnalysis performs comprehensive volume analysis
-func CalculateVolumeAnalysis(dataset [][]string, vmaPeriod, vrocPeriod int) ([]VolumeResult, error) {
+func CalculateVolumeAnalysis(dataset []OHLCV, vmaPeriod, vrocPeriod int) ([]VolumeResult, error) {
 	if len(dataset) == 0 {
 		return nil, errors.New("dataset is empty")
 	}
@@ -64,30 +63,10 @@ func CalculateVolumeAnalysis(dataset [][]string, vmaPeriod, vrocPeriod int) ([]V
 	lows := make([]float64, len(dataset))
 
 	for i, candle := range dataset {
-		volume, err := strconv.ParseFloat(candle[5], 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid volume at index %d: %w", i, err)
-		}
-
-		close, err := strconv.ParseFloat(candle[2], 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid close at index %d: %w", i, err)
-		}
-
-		high, err := strconv.ParseFloat(candle[3], 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid high at index %d: %w", i, err)
-		}
-
-		low, err := strconv.ParseFloat(candle[4], 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid low at index %d: %w", i, err)
-		}
-
-		volumes[i] = volume
-		closes[i] = close
-		highs[i] = high
-		lows[i] = low
+		volumes[i] = candle.Volume
+		closes[i] = candle.Close
+		highs[i] = candle.High
+		lows[i] = candle.Low
 	}
 
 	// Initialize first OBV value
@@ -134,7 +113,7 @@ func CalculateVolumeAnalysis(dataset [][]string, vmaPeriod, vrocPeriod int) ([]V
 		}
 
 		results = append(results, VolumeResult{
-			Timestamp: dataset[i][0],
+			Timestamp: dataset[i].Timestamp.Format("2006-01-02T15:04:05Z"),
 			Volume:    volumes[i],
 			VMA:       vma,
 			OBV:       obv,
@@ -148,7 +127,7 @@ func CalculateVolumeAnalysis(dataset [][]string, vmaPeriod, vrocPeriod int) ([]V
 }
 
 // GetLatestVolumeAnalysis returns the most recent volume analysis
-func GetLatestVolumeAnalysis(dataset [][]string, vmaPeriod, vrocPeriod int) (VolumeResult, error) {
+func GetLatestVolumeAnalysis(dataset []OHLCV, vmaPeriod, vrocPeriod int) (VolumeResult, error) {
 	results, err := CalculateVolumeAnalysis(dataset, vmaPeriod, vrocPeriod)
 	if err != nil {
 		return VolumeResult{}, err
@@ -162,7 +141,7 @@ func GetLatestVolumeAnalysis(dataset [][]string, vmaPeriod, vrocPeriod int) (Vol
 }
 
 // DetectVolumeBreakout identifies unusual volume activity
-func DetectVolumeBreakout(dataset [][]string, vmaPeriod int, multiplier float64) (VolumeSignal, error) {
+func DetectVolumeBreakout(dataset []OHLCV, vmaPeriod int, multiplier float64) (VolumeSignal, error) {
 	latest, err := GetLatestVolumeAnalysis(dataset, vmaPeriod, 5)
 	if err != nil {
 		return VolumeSignal{}, err
@@ -195,8 +174,8 @@ func DetectVolumeBreakout(dataset [][]string, vmaPeriod int, multiplier float64)
 
 		// Determine trend based on price action and OBV
 		if len(dataset) >= 2 {
-			currentClose, _ := strconv.ParseFloat(dataset[len(dataset)-1][2], 64)
-			prevClose, _ := strconv.ParseFloat(dataset[len(dataset)-2][2], 64)
+			currentClose := dataset[len(dataset)-1].Close
+			prevClose := dataset[len(dataset)-2].Close
 
 			if currentClose > prevClose && latest.OBV > 0 {
 				signal.Trend = "bullish"
@@ -215,7 +194,7 @@ func DetectVolumeBreakout(dataset [][]string, vmaPeriod int, multiplier float64)
 }
 
 // DetectAccumulationDistribution analyzes money flow patterns
-func DetectAccumulationDistribution(dataset [][]string, lookback int) (VolumeSignal, error) {
+func DetectAccumulationDistribution(dataset []OHLCV, lookback int) (VolumeSignal, error) {
 	if lookback < 5 {
 		lookback = 5
 	}
@@ -294,7 +273,7 @@ type VolumeStrategy struct {
 }
 
 // AnalyzeVolumeStrategy provides complete volume analysis for trading decisions
-func AnalyzeVolumeStrategy(dataset [][]string, vmaPeriod, vrocPeriod int) (VolumeStrategy, error) {
+func AnalyzeVolumeStrategy(dataset []OHLCV, vmaPeriod, vrocPeriod int) (VolumeStrategy, error) {
 	// Get current volume analysis
 	current, err := GetLatestVolumeAnalysis(dataset, vmaPeriod, vrocPeriod)
 	if err != nil {

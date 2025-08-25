@@ -25,7 +25,7 @@ const (
 )
 
 // CalculateRSI calculates Relative Strength Index for the given dataset
-func CalculateRSI(dataset [][]string, period int, priceType PriceType) ([]RSIResult, error) {
+func CalculateRSI(dataset []OHLCV, period int, priceType PriceType) ([]RSIResult, error) {
 	if len(dataset) == 0 {
 		return nil, errors.New("dataset is empty")
 	}
@@ -41,10 +41,7 @@ func CalculateRSI(dataset [][]string, period int, priceType PriceType) ([]RSIRes
 	// Extract prices
 	var prices []float64
 	for _, candle := range dataset {
-		price, err := extractPrice(candle, priceType)
-		if err != nil {
-			return nil, err
-		}
+		price := candle.ExtractPrice(priceType)
 		prices = append(prices, price)
 	}
 
@@ -89,7 +86,7 @@ func CalculateRSI(dataset [][]string, period int, priceType PriceType) ([]RSIRes
 	// Add first RSI result
 	signal := getRSISignal(rsi)
 	results = append(results, RSIResult{
-		Timestamp: dataset[period][0], // period+1 index in original dataset
+		Timestamp: dataset[period].Timestamp.Format("2006-01-02T15:04:05Z"), // period+1 index in original dataset
 		Value:     rsi,
 		Signal:    signal,
 	})
@@ -109,7 +106,7 @@ func CalculateRSI(dataset [][]string, period int, priceType PriceType) ([]RSIRes
 
 		signal = getRSISignal(rsi)
 		results = append(results, RSIResult{
-			Timestamp: dataset[i+1][0], // i+1 because gains array is offset by 1
+			Timestamp: dataset[i+1].Timestamp.Format("2006-01-02T15:04:05Z"), // i+1 because gains array is offset by 1
 			Value:     rsi,
 			Signal:    signal,
 		})
@@ -135,7 +132,7 @@ func getRSISignal(rsi float64) string {
 }
 
 // GetLatestRSI returns the most recent RSI value
-func GetLatestRSI(dataset [][]string, period int, priceType PriceType) (RSIResult, error) {
+func GetLatestRSI(dataset []OHLCV, period int, priceType PriceType) (RSIResult, error) {
 	rsiResults, err := CalculateRSI(dataset, period, priceType)
 	if err != nil {
 		return RSIResult{}, err
@@ -156,7 +153,7 @@ type RSIDivergence struct {
 }
 
 // DetectRSIDivergence identifies potential trend reversal signals
-func DetectRSIDivergence(dataset [][]string, period int, priceType PriceType, lookback int) (RSIDivergence, error) {
+func DetectRSIDivergence(dataset []OHLCV, period int, priceType PriceType, lookback int) (RSIDivergence, error) {
 	if lookback < 5 {
 		lookback = 5 // Minimum lookback for meaningful divergence
 	}
@@ -179,7 +176,7 @@ func DetectRSIDivergence(dataset [][]string, period int, priceType PriceType, lo
 	var rsiHighs, rsiLows []float64
 
 	for i, rsi := range recentRSI {
-		price, _ := extractPrice(recentPrices[i], ClosePrice)
+		price := recentPrices[i].ExtractPrice(ClosePrice)
 
 		// Simple peak/trough detection
 		if i > 0 && i < len(recentRSI)-1 {
@@ -254,7 +251,7 @@ type RSIStrategy struct {
 }
 
 // AnalyzeRSIStrategy provides complete RSI analysis for trading decisions
-func AnalyzeRSIStrategy(dataset [][]string, period int, priceType PriceType) (RSIStrategy, error) {
+func AnalyzeRSIStrategy(dataset []OHLCV, period int, priceType PriceType) (RSIStrategy, error) {
 	// Get current RSI
 	currentRSI, err := GetLatestRSI(dataset, period, priceType)
 	if err != nil {

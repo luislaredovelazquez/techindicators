@@ -16,7 +16,7 @@ type BollingerBands struct {
 }
 
 // CalculateBollingerBands calculates Bollinger Bands for the given dataset
-func CalculateBollingerBands(dataset [][]string, period int, multiplier float64, priceType PriceType) ([]BollingerBands, error) {
+func CalculateBollingerBands(dataset []OHLCV, period int, multiplier float64, priceType PriceType) ([]BollingerBands, error) {
 	if len(dataset) == 0 {
 		return nil, errors.New("dataset is empty")
 	}
@@ -42,10 +42,7 @@ func CalculateBollingerBands(dataset [][]string, period int, multiplier float64,
 
 		// Collect prices for the period
 		for j := i - period + 1; j <= i; j++ {
-			price, err := extractPrice(dataset[j], priceType)
-			if err != nil {
-				return nil, fmt.Errorf("error at index %d: %w", j, err)
-			}
+			price := dataset[j].ExtractPrice(priceType)
 			prices = append(prices, price)
 			sum += price
 		}
@@ -72,7 +69,7 @@ func CalculateBollingerBands(dataset [][]string, period int, multiplier float64,
 		}
 
 		results = append(results, BollingerBands{
-			Timestamp:  dataset[i][0],
+			Timestamp:  dataset[i].Timestamp.Format("2006-01-02T15:04:05Z"),
 			UpperBand:  upperBand,
 			MiddleBand: sma,
 			LowerBand:  lowerBand,
@@ -84,7 +81,7 @@ func CalculateBollingerBands(dataset [][]string, period int, multiplier float64,
 }
 
 // GetLatestBollingerBands returns the most recent Bollinger Bands values
-func GetLatestBollingerBands(dataset [][]string, period int, multiplier float64, priceType PriceType) (BollingerBands, error) {
+func GetLatestBollingerBands(dataset []OHLCV, period int, multiplier float64, priceType PriceType) (BollingerBands, error) {
 	bands, err := CalculateBollingerBands(dataset, period, multiplier, priceType)
 	if err != nil {
 		return BollingerBands{}, err
@@ -109,7 +106,7 @@ const (
 )
 
 // GetPricePosition determines where current price is relative to Bollinger Bands
-func GetPricePosition(dataset [][]string, period int, multiplier float64, priceType PriceType, tolerance float64) (BollingerPosition, error) {
+func GetPricePosition(dataset []OHLCV, period int, multiplier float64, priceType PriceType, tolerance float64) (BollingerPosition, error) {
 	if len(dataset) == 0 {
 		return "", errors.New("dataset is empty")
 	}
@@ -121,10 +118,7 @@ func GetPricePosition(dataset [][]string, period int, multiplier float64, priceT
 	}
 
 	// Get current price
-	currentPrice, err := extractPrice(dataset[len(dataset)-1], ClosePrice)
-	if err != nil {
-		return "", err
-	}
+	currentPrice := dataset[len(dataset)-1].ExtractPrice(ClosePrice)
 
 	// Calculate tolerance ranges
 	upperTolerance := bands.UpperBand * (1 - tolerance)
@@ -145,7 +139,7 @@ func GetPricePosition(dataset [][]string, period int, multiplier float64, priceT
 }
 
 // BollingerSqueeze detects if bands are in a squeeze (low volatility)
-func BollingerSqueeze(dataset [][]string, period int, multiplier float64, priceType PriceType, lookback int) (bool, error) {
+func BollingerSqueeze(dataset []OHLCV, period int, multiplier float64, priceType PriceType, lookback int) (bool, error) {
 	bands, err := CalculateBollingerBands(dataset, period, multiplier, priceType)
 	if err != nil {
 		return false, err
@@ -173,7 +167,7 @@ func BollingerSqueeze(dataset [][]string, period int, multiplier float64, priceT
 }
 
 // BollingerBreakout detects potential breakouts from Bollinger Bands
-func BollingerBreakout(dataset [][]string, period int, multiplier float64, priceType PriceType) (string, error) {
+func BollingerBreakout(dataset []OHLCV, period int, multiplier float64, priceType PriceType) (string, error) {
 	if len(dataset) < 2 {
 		return "insufficient_data", nil
 	}
@@ -219,7 +213,7 @@ type BollingerStrategy struct {
 }
 
 // AnalyzeBollingerStrategy provides complete Bollinger Bands analysis for trading decisions
-func AnalyzeBollingerStrategy(dataset [][]string, period int, multiplier float64, priceType PriceType) (BollingerStrategy, error) {
+func AnalyzeBollingerStrategy(dataset []OHLCV, period int, multiplier float64, priceType PriceType) (BollingerStrategy, error) {
 	position, err := GetPricePosition(dataset, period, multiplier, priceType, 0.02)
 	if err != nil {
 		return BollingerStrategy{}, err
